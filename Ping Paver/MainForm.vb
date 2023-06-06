@@ -1,5 +1,7 @@
-﻿Imports System.Net.NetworkInformation
+﻿Imports System.Net
+Imports System.Net.NetworkInformation
 Imports System.Text
+Imports System.Text.RegularExpressions
 Imports System.Threading
 Imports System.Windows.Forms.DataVisualization.Charting
 
@@ -10,7 +12,7 @@ Public Class MainForm
     Private tracerouteResults As List(Of String) ' Store traceroute results
     Private pingThread As Thread ' Thread for pinging
     Private isPingLoopRunning As Boolean = False
-    Private maxHops As Integer = 6
+    Private maxHops As Integer = 8
     Private hopTimeout As Integer = 1000
     Private cancellationTokenSource As CancellationTokenSource
     Private pingHistory As New Dictionary(Of String, List(Of PingData))()
@@ -67,7 +69,12 @@ Public Class MainForm
             Dim row As DataGridViewRow = New DataGridViewRow()
             row.CreateCells(PingListBox)
             row.Cells(0).Value = hopAddress ' Set the IP/Hostname value
-            row.Cells(1).Value = hopHostname 'set the hostname
+            If Not String.IsNullOrEmpty(hopHostname) Then
+                row.Cells(1).Value = hopHostname 'set the hostname
+            Else
+                row.Cells(1).Value = "Unresolved"
+                row.Cells(1).ToolTipText = "Unable to resolve hostname, you may want to check your DNS settings if this reoccurs."
+            End If
             ' Set values for other columns if needed
             row.Cells(2).Value = Nothing ' Current Ping
             row.Cells(3).Value = Nothing ' Lowest Ping
@@ -84,7 +91,6 @@ Public Class MainForm
         End If
     End Sub
 
-
     Private Function ExtractHopHostname(hopData As String) As String
         ' Find the first occurrence of "[" and "]" to extract the IP address or hostname
         Dim startIndex As Integer = hopData.LastIndexOf("  ")
@@ -98,17 +104,16 @@ Public Class MainForm
     End Function
 
     Private Function ExtractHopAddress(hopData As String) As String
-        ' Find the first occurrence of "[" and "]" to extract the IP address or hostname
-        Dim startIndex As Integer = hopData.IndexOf("[")
-        Dim endIndex As Integer = hopData.IndexOf("]")
-        If startIndex >= 0 AndAlso endIndex >= 0 AndAlso endIndex > startIndex Then
-            Dim hopAddress As String = hopData.Substring(startIndex + 1, endIndex - startIndex - 1)
-            Return hopAddress.Trim()
+        Dim regexPattern As String = "\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b"
+        Dim regex As New Regex(regexPattern)
+
+        Dim match As Match = regex.Match(hopData)
+        If match.Success Then
+            Return match.Value.Trim()
         End If
 
         Return String.Empty
     End Function
-
 
     Private Sub StartPingLoop()
         Dim pingThread As New Thread(AddressOf PingLoop)
@@ -296,35 +301,35 @@ Public Class MainForm
         If Chart1.Visible Then
             ' Get the selected node from the DataGridView
             Dim selectedNode As String = PingListBox.SelectedCells(0).Value
-
+            If selectedNode Is Nothing Then Exit Sub
             ' Check if the selected node exists in the ping history dictionary
             If chartpingHistory.ContainsKey(selectedNode) Then
-                ' Get the ping history for the selected node
-                Dim nodePingHistory As List(Of PingData) = chartpingHistory(selectedNode)
+                    ' Get the ping history for the selected node
+                    Dim nodePingHistory As List(Of PingData) = chartpingHistory(selectedNode)
 
-                ' Clear the chart series
-                Chart1.Series("LossSeries").Points.Clear()
-                Chart1.Series("PingSeries").Points.Clear()
+                    ' Clear the chart series
+                    Chart1.Series("LossSeries").Points.Clear()
+                    Chart1.Series("PingSeries").Points.Clear()
 
-                ' Calculate packet loss
-                Dim totalPings As Integer = nodePingHistory.Count
-                Dim failedPings As Integer = nodePingHistory.Where(Function(pingData) Not pingData.Success).Count()
-                Dim packetLoss As Double = (failedPings / totalPings) * 100
+                    ' Calculate packet loss
+                    Dim totalPings As Integer = nodePingHistory.Count
+                    Dim failedPings As Integer = nodePingHistory.Where(Function(pingData) Not pingData.Success).Count()
+                    Dim packetLoss As Double = (failedPings / totalPings) * 100
 
-                ' Add data points to the series
-                For Each pingData As PingData In nodePingHistory
-                    ' Create a new data point for packet loss value
-                    Dim lossDataPoint As New DataPoint(pingData.Timestamp.ToOADate(), packetLoss)
-                    Chart1.Series("LossSeries").Points.Add(lossDataPoint)
+                    ' Add data points to the series
+                    For Each pingData As PingData In nodePingHistory
+                        ' Create a new data point for packet loss value
+                        Dim lossDataPoint As New DataPoint(pingData.Timestamp.ToOADate(), packetLoss)
+                        Chart1.Series("LossSeries").Points.Add(lossDataPoint)
 
-                    ' Create a new data point for ping value
-                    Dim pingDataPoint As New DataPoint(pingData.Timestamp.ToOADate(), pingData.Ping)
-                    Chart1.Series("PingSeries").Points.Add(pingDataPoint)
-                    ' Display data labels at the data points
-                Next
+                        ' Create a new data point for ping value
+                        Dim pingDataPoint As New DataPoint(pingData.Timestamp.ToOADate(), pingData.Ping)
+                        Chart1.Series("PingSeries").Points.Add(pingDataPoint)
+                        ' Display data labels at the data points
+                    Next
 
+                End If
             End If
-        End If
     End Sub
 
 
