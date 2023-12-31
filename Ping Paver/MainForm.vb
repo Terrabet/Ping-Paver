@@ -13,7 +13,7 @@ Public Class MainForm
     Private pingThread As Thread ' Thread for pinging
     Private isPingLoopRunning As Boolean = False
     Private maxHops As Integer = 8
-    Private hopTimeout As Integer = 1000
+    Private hopTimeout As Integer = 300
     Private cancellationTokenSource As CancellationTokenSource
     Private pingHistory As New Dictionary(Of String, List(Of PingData))()
 
@@ -26,10 +26,13 @@ Public Class MainForm
         ' Use the traceroute command to get the network path
         Dim tracerouteProcess As New Process()
         tracerouteProcess.StartInfo.FileName = "tracert"
-        tracerouteProcess.StartInfo.Arguments = "-h " & maxHops & " " & " -w " & hopTimeout & " " & targetAddress
+        tracerouteProcess.StartInfo.Arguments = "-h " & maxHops & " -w " & hopTimeout & " " & targetAddress
         tracerouteProcess.StartInfo.UseShellExecute = False
         tracerouteProcess.StartInfo.RedirectStandardOutput = True
         tracerouteProcess.StartInfo.CreateNoWindow = True
+
+        Debug.Print("Running " & tracerouteProcess.StartInfo.FileName & " " & tracerouteProcess.StartInfo.Arguments)
+
         tracerouteProcess.Start()
 
         ' Read the output synchronously line by line
@@ -58,37 +61,44 @@ Public Class MainForm
     End Sub
 
     Private Sub ProcessTracerouteLine(line As String)
-        ' Parse and store the traceroute results
-        ' Extract the IP or hostname of each hop (e.g., "  1    <1 ms    <1 ms    <1 ms  [192.168.1.1]")
-        Dim hopData As String = line.Trim()
-        Dim hopAddress As String = ExtractHopAddress(hopData)
-        Dim hopHostname As String = ExtractHopHostname(hopData)
-        If Not String.IsNullOrEmpty(hopAddress) Then
-            tracerouteResults.Add(hopAddress)
-            ' Add a new row to the PingListBox (DataGridView)
-            Dim row As DataGridViewRow = New DataGridViewRow()
-            row.CreateCells(PingListBox)
-            row.Cells(0).Value = hopAddress ' Set the IP/Hostname value
-            If Not String.IsNullOrEmpty(hopHostname) Then
-                row.Cells(1).Value = hopHostname 'set the hostname
-            Else
-                row.Cells(1).Value = "Unresolved"
-                row.Cells(1).ToolTipText = "Unable to resolve hostname, you may want to check your DNS settings if this reoccurs."
+        Try
+
+            ' Parse and store the traceroute results
+            ' Extract the IP or hostname of each hop (e.g., "  1    <1 ms    <1 ms    <1 ms  [192.168.1.1]")
+            Dim hopData As String = line.Trim()
+            Dim hopAddress As String = ExtractHopAddress(hopData)
+            Dim hopHostname As String = ExtractHopHostname(hopData)
+            If Not String.IsNullOrEmpty(hopAddress) Then
+                tracerouteResults.Add(hopAddress)
+                ' Add a new row to the PingListBox (DataGridView)
+                Dim row As DataGridViewRow = New DataGridViewRow()
+                row.CreateCells(PingListBox)
+                row.Cells(0).Value = hopAddress ' Set the IP/Hostname value
+                If Not String.IsNullOrEmpty(hopHostname) Then
+                    row.Cells(1).Value = hopHostname 'set the hostname
+                Else
+                    row.Cells(1).Value = "Unresolved"
+                    row.Cells(1).ToolTipText = "Unable to resolve hostname, you may want to check your DNS settings if this reoccurs."
+                End If
+                ' Set values for other columns if needed
+                row.Cells(2).Value = Nothing ' Current Ping
+                row.Cells(3).Value = Nothing ' Lowest Ping
+                row.Cells(4).Value = Nothing ' Highest Ping
+                PingListBox.Rows.Add(row)
+
+                ' ...
+
+                ' Create a new list to store the ping history for the node
+                Dim nodePingHistory As New List(Of PingData)()
+
+                ' Store the ping history in the dictionary
+                pingHistory.Add(hopAddress, nodePingHistory)
             End If
-            ' Set values for other columns if needed
-            row.Cells(2).Value = Nothing ' Current Ping
-            row.Cells(3).Value = Nothing ' Lowest Ping
-            row.Cells(4).Value = Nothing ' Highest Ping
-            PingListBox.Rows.Add(row)
 
-            ' ...
-
-            ' Create a new list to store the ping history for the node
-            Dim nodePingHistory As New List(Of PingData)()
-
-            ' Store the ping history in the dictionary
-            pingHistory.Add(hopAddress, nodePingHistory)
-        End If
+        Catch ex As Exception
+            Debug.Print(ex.Message)
+            MsgBox(ex.Message, MsgBoxStyle.Critical, "Error")
+        End Try
     End Sub
 
     Private Function ExtractHopHostname(hopData As String) As String
