@@ -12,6 +12,14 @@ The idea for Ping Paver came from applications like Ping Plotter, aiming to prov
 - Customize the ping interval and duration of the ping history.
 - Highlight successful and unsuccessful pings in the user interface.
 
+
+## Changes
+- Hop IP Extraction Updated: The method for extracting the hop IP address has been updated to use regular expressions. This allows for more flexibility in matching different IP address formats found in the traceroute results.
+- Hop Hostname Update: The application now notifies the user when a hostname couldn't be resolved for a hop. This provides transparency and helps the user understand when no hostname information is available.
+- Fixed Empty Cell Selection Error: An error that occurred when empty cells were selected has been resolved. The application now handles empty cell selection gracefully without causing any disruptions.
+- Added Final Destination as IP to Ping: The application now includes the final destination IP address as a target to be pinged. This provides a comprehensive overview of the network path, including the final destination.
+
+
 ## Prerequisites
 
 - .NET 6.0 SDK or runtime.
